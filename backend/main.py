@@ -6,13 +6,12 @@ import uuid
 import sqlite3
 from datetime import datetime
 
-from fastapi import FastAPI, File, UploadFile, Form
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi import FastAPI, File, UploadFile, Form, Request
+from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
-
 import onnxruntime as ort
 
 app = FastAPI()
@@ -23,7 +22,7 @@ ROOT_DIR = os.path.abspath(os.path.join(BASE_DIR, ".."))
 
 DATABASE = os.path.join(ROOT_DIR, "database.db")
 STATIC_DIR = os.path.join(ROOT_DIR, "static")
-FRONTEND_DIR = os.path.join(ROOT_DIR, "frontend")
+FRONTEND_DIST = os.path.join(ROOT_DIR, "frontend", "dist")
 MODEL_PATH = os.path.join(ROOT_DIR, "models", "model.onnx")
 
 # Create folders
@@ -59,22 +58,13 @@ app.add_middleware(
 )
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-app.mount("/frontend", StaticFiles(directory=FRONTEND_DIR), name="frontend")
-app.mount("/user", StaticFiles(directory=os.path.join(FRONTEND_DIR, "user")), name="user_static")
-app.mount("/admin", StaticFiles(directory=os.path.join(FRONTEND_DIR, "admin")), name="admin_static")
 
-# CONFIG JS
-@app.get("/config.js")
-def config_js():
-    return FileResponse(os.path.join(FRONTEND_DIR, "config.js"), media_type="application/javascript")
-
-# LOGIN PAGE
-@app.get("/login")
-def login_page():
-    return FileResponse(os.path.join(FRONTEND_DIR, "user/login.html"))
+# Mount React static assets (JS, CSS, images) from the /assets folder
+if os.path.exists(os.path.join(FRONTEND_DIST, "assets")):
+    app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIST, "assets")), name="assets")
 
 # LOGIN API
-@app.post("/login")
+@app.post("/api/login")
 def login(username: str = Form(...), password: str = Form(...)):
     conn, cursor = get_db()
     cursor.execute("SELECT id, role FROM users WHERE username=? AND password=?", (username, password))
@@ -86,8 +76,8 @@ def login(username: str = Form(...), password: str = Form(...)):
     else:
         return {"status": "invalid"}
 
-# REGISTER
-@app.post("/register")
+# REGISTER API
+@app.post("/api/register")
 def register(username: str = Form(...), password: str = Form(...)):
     conn, cursor = get_db()
     try:
@@ -99,29 +89,6 @@ def register(username: str = Form(...), password: str = Form(...)):
         conn.close()
         return {"status": "user_exists"}
 
-# USER PAGES
-@app.get("/")
-def user_home():
-    return FileResponse(os.path.join(FRONTEND_DIR, "user/index.html"))
-
-@app.get("/result-page")
-def result_page():
-    return FileResponse(os.path.join(FRONTEND_DIR, "user/result.html"))
-
-@app.get("/history-page")
-def history_page():
-    return FileResponse(os.path.join(FRONTEND_DIR, "user/history.html"))
-
-# ADMIN PAGES
-@app.get("/admin")
-def admin_dashboard():
-    return FileResponse(os.path.join(FRONTEND_DIR, "admin/dashboard.html"))
-
-@app.get("/admin/stats")
-def admin_stats_page():
-    return FileResponse(os.path.join(FRONTEND_DIR, "admin/stats.html"))
-
-# PDF GENERATE
 def generate_pdf(patient_name, patient_id, prediction, confidence, image_path):
     pdf_filename = f"report_{patient_id}_{uuid.uuid4().hex[:6]}.pdf"
     pdf_path = os.path.join(STATIC_DIR, "reports", pdf_filename)
@@ -146,8 +113,8 @@ def generate_pdf(patient_name, patient_id, prediction, confidence, image_path):
 
     return f"/static/reports/{pdf_filename}"
 
-# PREDICT
-@app.post("/predict")
+# PREDICT API
+@app.post("/api/predict")
 async def predict(
     file: UploadFile = File(...),
     patient_name: str = Form(...),
@@ -198,8 +165,8 @@ async def predict(
         conn.close()
         return JSONResponse({"error": str(e)}, status_code=500)
 
-# USER HISTORY
-@app.get("/history/{user_id}")
+# USER HISTORY API
+@app.get("/api/history/{user_id}")
 def history(user_id: int):
     conn, cursor = get_db()
     cursor.execute("SELECT * FROM predictions WHERE user_id=? ORDER BY date DESC", (user_id,))
@@ -220,8 +187,8 @@ def history(user_id: int):
 
     return data
 
-# ADMIN ALL HISTORY
-@app.get("/admin/all-history")
+# ADMIN ALL HISTORY API
+@app.get("/api/admin/all-history")
 def admin_all_history():
     conn, cursor = get_db()
     cursor.execute("SELECT * FROM predictions ORDER BY date DESC")
@@ -243,8 +210,8 @@ def admin_all_history():
 
     return data
 
-# DELETE
-@app.delete("/delete/{record_id}")
+# DELETE RECORD API
+@app.delete("/api/delete/{record_id}")
 def delete_record(record_id: int):
     conn, cursor = get_db()
     cursor.execute("DELETE FROM predictions WHERE id=?", (record_id,))
@@ -252,23 +219,18 @@ def delete_record(record_id: int):
     conn.close()
     return {"message": "Deleted"}
 
-# STATS
-@app.get("/stats")
+# STATS API
+@app.get("/api/stats")
 def stats():
     conn, cursor = get_db()
-
     cursor.execute("SELECT COUNT(*) FROM predictions")
     total_predictions = cursor.fetchone()[0]
-
     cursor.execute("SELECT COUNT(*) FROM predictions WHERE prediction='Tumor'")
     tumor_cases = cursor.fetchone()[0]
-
     cursor.execute("SELECT COUNT(*) FROM predictions WHERE prediction='No Tumor'")
     no_tumor_cases = cursor.fetchone()[0]
-
     cursor.execute("SELECT COUNT(DISTINCT patient_id) FROM predictions")
     total_patients = cursor.fetchone()[0]
-
     conn.close()
 
     return {
@@ -278,11 +240,10 @@ def stats():
         "total_patients": total_patients
     }
 
-# STATS DETAILS
-@app.get("/stats-details")
+# STATS DETAILS API
+@app.get("/api/stats-details")
 def stats_details():
     conn, cursor = get_db()
-
     cursor.execute("""
         SELECT prediction, COUNT(*) 
         FROM predictions 
@@ -297,10 +258,24 @@ def stats_details():
         ORDER BY DATE(date)
     """)
     daily_predictions = cursor.fetchall()
-
     conn.close()
 
     return {
         "prediction_counts": prediction_counts,
         "daily_predictions": daily_predictions
     }
+
+# CATCH-ALL FOR REACT SPA
+@app.get("/{full_path:path}")
+async def serve_spa(request: Request, full_path: str):
+    # Try serving a static file directly if it exists
+    filepath = os.path.join(FRONTEND_DIST, full_path)
+    if os.path.isfile(filepath):
+        return FileResponse(filepath)
+    
+    # Fallback to index.html for React Router
+    index_file = os.path.join(FRONTEND_DIST, "index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
+    
+    return HTMLResponse("React build not found. Please run npm run build in the frontend directory.", status_code=404)
