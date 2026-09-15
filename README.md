@@ -392,7 +392,7 @@ Smaller runtime environment
 
 ## Run Locally
 
-git clone https://github.com/masud744/neuroscan-ai
+git clone https://github.com/competitive7coder/NeuroScan-AI
 cd neuroscan-ai
 python -m venv venv
 venv\Scripts\activate
