@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+numpy
+opencv-python-headless
+python-multipart
+reportlab
+pillow
+scikit-learn
+onnxruntime
+onnx
