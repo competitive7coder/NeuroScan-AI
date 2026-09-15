@@ -112,52 +112,6 @@ neuroscan-ai/
 
 ---
 
-## Application Screenshots
-
-### Login Page
-
-<p align="center">
-  <img src="Images/Login_page.png" width="700"/>
-</p>
-
-### Main Upload Page
-
-<p align="center">
-  <img src="Images/main_page.png" width="700"/>
-</p>
-
-### Analysis Result Page
-
-<p align="center">
-  <img src="Images/Analysis_result.png" width="700"/>
-</p>
-
-### Medical PDF Report
-
-<p align="center">
-  <img src="Images/Medical_report.png" width="700"/>
-</p>
-
-### User Prediction History
-
-<p align="center">
-  <img src="Images/User_prediction_history.png" width="700"/>
-</p>
-
-### Admin Dashboard
-
-<p align="center">
-  <img src="Images/admin_dashboard.png" width="700"/>
-</p>
-
-### Admin Analytical Statistics
-
-<p align="center">
-  <img src="Images/Admin_analytical_statistics.png" width="700"/>
-</p>
-
----
-
 ## Machine Learning Model
 
 The brain tumor detection model is built using Deep Learning with Convolutional Neural Networks (CNN).
